@@ -183,6 +183,8 @@
     <script>
         let socket;
         let active = false;
+        const sensorId = localStorage.getItem('sensor_id') || `sensor-${Math.random().toString(36).slice(2, 8)}`;
+        localStorage.setItem('sensor_id', sensorId);
         const canvas = document.getElementById('waveCanvas');
         const ctx = canvas.getContext('2d');
         let points = [];
@@ -237,7 +239,7 @@
                 document.getElementById('sense-status').innerText = "LIVE";
                 document.getElementById('sense-status').style.color = "#22c55e";
 
-                window.addEventListener("devicemotion", (e) => {
+                const startListener = () => window.addEventListener("devicemotion", (e) => {
                     const acc = e.accelerationIncludingGravity;
                     if (acc) {
                         const x = acc.x || 0;
@@ -252,10 +254,26 @@
                         if(points.length > 50) points.shift();
 
                         if (socket && socket.connected) {
-                            socket.emit('vibration_data', { x, y, z, timestamp: Date.now() });
+                            socket.emit('vibration_data', { x, y, z, timestamp: Date.now(), sensorId });
                         }
                     }
                 }, true);
+
+                const permissionApi = window.DeviceMotionEvent && window.DeviceMotionEvent.requestPermission;
+                if (typeof permissionApi === 'function') {
+                    permissionApi().then((state) => {
+                        if (state === 'granted') startListener();
+                        else {
+                            document.getElementById('sense-status').innerText = 'DENIED';
+                            document.getElementById('sense-status').style.color = '#ef4444';
+                        }
+                    }).catch(() => {
+                        document.getElementById('sense-status').innerText = 'DENIED';
+                        document.getElementById('sense-status').style.color = '#ef4444';
+                    });
+                } else {
+                    startListener();
+                }
             }
         }
     </script>

@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Structural Health Index from Passive Vibration Sensing
 
-## Getting Started
+This project implements a real-time structural health monitoring prototype for **Problem 04**:
 
-First, run the development server:
+> Build a system that processes passive vibration time-series data from low-cost accelerometers to compute a structural health index and detect resonant frequency shifts correlated with fatigue.
+
+## What this version now includes
+
+- **Realtime ingestion + broadcast** over Socket.IO.
+- **Signal quality controls** with payload sanitization and lightweight rate limiting.
+- **Windowed spectral analysis** (DC removal + Hann window + DFT).
+- **Dominant frequency tracking** in a configurable structural band.
+- **Structural Health Index (SHI)** based on baseline resonance drift, intensity, and confidence.
+- **Sensor identity + timestamps** for traceability.
+- **Mobile-friendly sensor publisher page** with permission handling.
+
+## Architecture
+
+- `server.mjs` — custom Next.js + Socket.IO server, sanitization, CORS config, rate limits.
+- `src/app/dashboard/page.tsx` — operator dashboard, time-series and spectral plots, SHI gauge.
+- `src/app/sensor/page.tsx` — browser sensor node publisher.
+- `public/sensor.html` — static low-overhead sensor publisher fallback.
+- `src/lib/structuralHealth.ts` — DSP + SHI logic.
+- `src/lib/realtimeTypes.ts` — realtime payload shape guards.
+
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Dashboard: `http://localhost:3000/dashboard`
+- Sensor UI (Next page): `http://localhost:3000/sensor`
+- Sensor UI (static fallback): `http://localhost:3000/sensor.html`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Data model
 
-## Learn More
+Vibration payload sent from sensor clients:
 
-To learn more about Next.js, take a look at the following resources:
+```json
+{
+  "x": 0.12,
+  "y": -0.30,
+  "z": 9.61,
+  "timestamp": 1760000000000,
+  "sensorId": "sensor-a1b2c3"
+}
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## SHI approach (heuristic baseline)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Convert tri-axial acceleration to vector magnitude.
+2. Remove DC component (gravity drift).
+3. Apply Hann window.
+4. Compute DFT magnitude spectrum.
+5. Find dominant resonance frequency in [0.2Hz, 30Hz].
+6. Compute SHI using:
+   - normalized frequency shift from calibrated baseline,
+   - vibration intensity penalty,
+   - low-confidence penalty.
+7. Smooth score with EMA for stability.
 
-## Deploy on Vercel
+## Next improvements (recommended)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Replace DFT with overlap-windowed Welch PSD for better noise robustness.
+- Add persistent storage for trend analysis.
+- Add anomaly alerts on sustained drift patterns.
+- Add per-asset baselines and environmental normalization (temperature/time-of-day).
+- Add authentication and per-sensor authorization.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Quality checks
+
+```bash
+npm run lint
+npm run build
+```
